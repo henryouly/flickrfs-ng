@@ -1,6 +1,6 @@
 [submodule "libs/fusepy"]
 	path = libs/fusepy
 	url = https://github.com/terencehonles/fusepy
-[submodule "libs/python-flickr-api"]
-	path = libs/python-flickr-api
+[submodule "libs/python_flickr_api"]
+	path = libs/python_flickr_api
 	url = git://github.com/alexis-mignon/python-flickr-api.git
