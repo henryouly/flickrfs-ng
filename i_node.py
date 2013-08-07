@@ -10,7 +10,7 @@ class INode(object):
 
   def __init__(self, **kwargs):
     now = int(time.time())
-    self.attr = dict(st_atime = now, st_ctime = now, st_gid = int(os.getuid()),
+    self.attr = dict(st_atime = now, st_ctime = now, st_gid = int(os.getgid()),
                      st_mode = MODE_FILE, st_mtime = now, st_nlink = 1,
                      st_size = 0L, st_uid = int(os.getuid()))
     for k in kwargs:
@@ -29,9 +29,7 @@ class INode(object):
 
   @staticmethod
   def root():
-    node = INode(st_mode = MODE_DIR)
-    node['st_nlink'] = 2
-    return node
+    return INode(st_mode = MODE_DIR, st_nlink = 2)
 
   def mknod(self, **kwargs):
     node = INode(**kwargs)

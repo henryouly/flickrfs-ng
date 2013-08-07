@@ -31,7 +31,16 @@ class Flickrfs(LoggingMixIn, Operations):
     return self.nodes[path].getattrs()
 
   def readdir(self, path, fh):
-    return ['.', '..'] + [x[1:] for x in self.nodes.keys() if x != '/']
+    ret = ['.', '..']
+    for x in self.nodes.keys():
+      if x == '/':
+        continue
+      (parent, base) = x.rsplit('/')
+      if len(parent) == 0: parent = '/'
+      if parent == path:
+        ret.append(base)
+
+    return ret
 
 
 if __name__ == '__main__':
