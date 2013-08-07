@@ -16,13 +16,11 @@ class INode(object):
     for k in kwargs:
       self.attr[k] = kwargs[k]
 
-  def __getitem__(self, key, default=None):
-    if not self.attr.has_key(key):
-      return default
-    return self.attr[key]
+  def __getattr__(self, key):
+    return self.__dict__['attr'][key]
 
-  def __setitem__(self, key, value):
-    self.attr[key] = value
+  def __setattr__(self, key, value):
+    object.__setattr__(self, key, value)
 
   def getattrs(self):
     return self.attr
@@ -34,6 +32,6 @@ class INode(object):
   def mknod(self, **kwargs):
     node = INode(**kwargs)
     if kwargs.get('st_mode', 0) & S_IFDIR:
-      node['st_nlink'] = 2
-    self.attr['st_nlink'] += 1
+      node.st_nlink = 2
+    self.st_nlink += 1
     return node
