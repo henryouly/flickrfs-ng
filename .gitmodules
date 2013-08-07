@@ -1,0 +1,3 @@
+[submodule "libs/fusepy"]
+	path = libs/fusepy
+	url = https://github.com/terencehonles/fusepy
