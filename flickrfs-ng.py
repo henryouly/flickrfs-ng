@@ -12,7 +12,7 @@ from threading import Lock
 import stat
 
 from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
-from i_node import INode, MODE_DIR
+from i_node import INode, MODE_DIR, MODE_FILE
 
 class Flickrfs(LoggingMixIn, Operations):
   def __init__(self):
@@ -23,7 +23,12 @@ class Flickrfs(LoggingMixIn, Operations):
     self.rwlock = Lock()
     self.nodes = {}
     self.nodes['/'] = INode.root()
+    self.nodes['/tags'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
+    self.nodes['/tags/personal'] = self.nodes['/tags'].mknod(st_mode = MODE_DIR)
+    self.nodes['/tags/public'] = self.nodes['/tags'].mknod(st_mode = MODE_DIR)
+    self.nodes['/sets'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
     self.nodes['/stream'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
+    self.nodes['/stream/file'] = self.nodes['/stream'].mknod(st_mode = MODE_FILE)
 
   def getattr(self, path, fh=None):
     if path not in self.nodes.keys():
@@ -35,7 +40,7 @@ class Flickrfs(LoggingMixIn, Operations):
     for x in self.nodes.keys():
       if x == '/':
         continue
-      (parent, base) = x.rsplit('/')
+      (parent, base) = x.rsplit('/', 1)
       if len(parent) == 0: parent = '/'
       if parent == path:
         ret.append(base)
