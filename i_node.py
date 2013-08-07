@@ -15,12 +15,21 @@ class INode(object):
                      st_size = 0L, st_uid = int(os.getuid()))
     for k in kwargs:
       self.attr[k] = kwargs[k]
+    self.__inited = True
 
   def __getattr__(self, key):
-    return self.__dict__['attr'][key]
+    try:
+      return self.__dict__['attr'][key]
+    except KeyError:
+      raise AttributeError(key)
 
   def __setattr__(self, key, value):
-    object.__setattr__(self, key, value)
+    if not self.__dict__.has_key('_INode__inited'):
+      object.__setattr__(self, key, value)
+    elif self.__dict__.has_key(key):
+      object.__setattr__(self, key, value)
+    else:
+      self.attr[key] = value
 
   def getattrs(self):
     return self.attr
