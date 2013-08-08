@@ -2,7 +2,7 @@
 
 from __future__ import with_statement
 
-import logging
+import logging, logging.handlers
 import os
 
 from errno import EACCES, ENOENT
@@ -13,16 +13,31 @@ from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 import libs.python_flickr_api.flickr_api as fapi
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
+from photo import PhotoStream
 
 
 class Flickrfs(LoggingMixIn, Operations):
   def __init__(self):
-    self.logger = logging.getLogger()
     self.rwlock = Lock()
     self.nodes = {}
-    self.__init_fs()
     self.__init_config()
+    self.__init_logging()
+    self.__init_fs()
     self.__auth()
+    self.photo_stream = PhotoStream(self.nodes['/stream'], '/stream', self.user)
+    print "Initialized"
+
+  def __init_logging(self):
+    logger = logging.getLogger()
+    handler = logging.handlers.RotatingFileHandler(self.log_file, "a", 5242880, 3)
+    formatter = logging.Formatter(
+        "%(asctime)s %(name)-14s %(levelname)-7s %(threadName)-10s %(funcName)-22s %(message)s", "%x %X")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    self.logger = logging.getLogger('flickrfs-ng')
+    self.logger.info("Logging initialized")
+
 
   def __init_fs(self):
     self.nodes['/'] = INode.root()
@@ -32,13 +47,14 @@ class Flickrfs(LoggingMixIn, Operations):
     self.nodes['/sets'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
     self.nodes['/date'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
     self.nodes['/stream'] = self.nodes['/'].mknod(st_mode = MODE_DIR)
-    self.nodes['/stream/file'] = self.nodes['/stream'].mknod(st_mode = MODE_FILE)
+    self.nodes['/user'] = self.nodes['/'].mknod(st_mode = MODE_FILE)
 
   def __init_config(self):
     self.home = os.getenv('HOME')
     self.config_dir = os.path.join(self.home, '.flickrfs-ng')
     self.config_file = os.path.join(self.config_dir, 'config.txt')
     self.auth_file = os.path.join(self.config_dir, 'auth.txt')
+    self.log_file = os.path.join(self.config_dir, 'flickrfs-ng.log')
     self.browser = "/usr/bin/x-www-browser"
 
   def __auth(self):
@@ -58,14 +74,29 @@ class Flickrfs(LoggingMixIn, Operations):
       a.set_verifier(server.oauth_verifier)
       a.save(self.auth_file)
     fapi.set_auth_handler(a)
+    print "Login..."
+    self.user = fapi.test.login()
     print "Authentication done."
 
+  def _get_photos(self):
+    photos = self.user.getPhotos()
+    print photos.info.pages
+    print photos.info.page
+    print photos.info.total
+    for photo in photos:
+      print photo.id, photo.title
+
+
   def getattr(self, path, fh=None):
+    if path.startswith('/stream/'):
+      return self.photo_stream.getattr(path, fh)
     if path not in self.nodes.keys():
       raise FuseOSError(ENOENT)
     return self.nodes[path].getattrs()
 
   def readdir(self, path, fh):
+    if path.startswith('/stream'):
+      return ['.', '..'] + self.photo_stream.file_list()
     p = [x.rsplit('/', 1) for x in self.nodes.keys()]
     if path == '/':
       path = ''
@@ -80,5 +111,5 @@ if __name__ == '__main__':
     print('usage: %s <mountpoint>' % argv[0])
     exit(1)
 
-  logging.getLogger().setLevel(logging.DEBUG)
+  log = logging.getLogger()
   fuse = FUSE(Flickrfs(), argv[1], foreground=True)
