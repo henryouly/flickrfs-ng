@@ -52,7 +52,7 @@ class Flickrfs(LoggingMixIn, Operations):
       os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
       try:
         server.serve_forever()
-      except:
+      except IOError:
         # safely ignore
         pass
       a.set_verifier(server.oauth_verifier)
