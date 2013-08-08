@@ -44,7 +44,7 @@ class MockUser:
                   taken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=1),
         MockPhoto(id=5,lastupdate=2,dateuploaded=2,title="",originalformat='png',
                   taken='2001-01-01 01:01:01',ispublic=0,isfamily=1,isfriend=0),
-        MockPhoto(id=6,lastupdate=2,dateuploaded=2,title="P6",originalformat='png',
+        MockPhoto(id=6,lastupdate=2,dateuploaded=1,title="P6",originalformat='png',
                   taken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=0),
     ]
 
@@ -77,6 +77,8 @@ class PhotoStreamTest(unittest.TestCase):
                      S_IFREG | 0764)
     self.assertEqual(self.pstream.photos['P6.png']['st_mode'],
                      S_IFREG | 0744)
+    self.assertEqual(self.pstream.photos['P6.png']['st_mtime'],2)
+    self.assertEqual(self.pstream.photos['P6.png']['st_ctime'],1)
 
 
 if __name__ == '__main__':
