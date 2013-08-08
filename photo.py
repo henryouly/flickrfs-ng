@@ -22,43 +22,12 @@ def _log_exception_wrapper(func, *args, **kw):
       log.error("exception in function %s", func.__name__)
       log.error(format_exc())
 
-def getUnixPerms(photo):
-  perms = 0744
-  if photo.isfriend:
-    perms |= 0010
-  if photo.isfamily:
-    perms |= 0020
-  if photo.ispublic:
-    perms |= 0011
-  return perms
-
 def getTakenDateStr(photo):
   return photo.taken.split(' ', 1)[0]
 
 def getTakenDate(photo):
   import time
   return time.mktime(time.strptime("%Y-%m-%d %H:%M:%S", photo.taken))
-
-def getFileName(photo, existing_photos):
-  filebase = photo.title
-  if len(filebase) == 0:
-    filebase = getTakenDateStr(photo)
-  while (filebase + "." + photo.ext) in existing_photos:
-    filesplit = filebase.rsplit(' ', 1)
-    num = 0
-    if len(filesplit) == 2:
-      try:
-        num = int(filesplit[1])
-      except ValueError:
-        pass
-    if num > 0:
-      num += 1
-      new_base = filesplit[0]
-    else:
-      num = 1
-      new_base = filebase
-    filebase = "%s %03d" % (new_base, num)
-  return "%s.%s" % (filebase, photo.ext)
 
 class PhotoStream:
   def __init__(self, inode, path, user):
@@ -69,7 +38,7 @@ class PhotoStream:
     self.syncer.start_sync_thread()
 
   def add_photo(self, photo):
-    photo.filename = getFileName(photo, self.photos.keys())
+    photo.filename = self._get_filename(photo)
     log.info("adding photo " + photo.filename)
     p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode,
                               st_mtime = photo.mtime,
@@ -84,6 +53,28 @@ class PhotoStream:
 
   def file_list(self):
     return self.photos.keys()
+
+  def _get_filename(self, photo):
+    existing = self.photos.keys()
+    filebase = photo.title
+    if len(filebase) == 0:
+      filebase = getTakenDateStr(photo)
+    while (filebase + "." + photo.ext) in existing:
+      filesplit = filebase.rsplit(' ', 1)
+      num = 0
+      if len(filesplit) == 2:
+        try:
+          num = int(filesplit[1])
+        except ValueError:
+          pass
+      if num > 0:
+        num += 1
+        new_base = filesplit[0]
+      else:
+        num = 1
+        new_base = filebase
+      filebase = "%s %03d" % (new_base, num)
+    return "%s.%s" % (filebase, photo.ext)
 
 
 class PhotoSyncer:
@@ -115,7 +106,7 @@ class Photo(object):
     self.filename = None
     self.mtime = int(photo.lastupdate)
     self.ctime = int(photo.dateuploaded)
-    self.mode = getUnixPerms(photo)
+    self.mode = self._get_unix_perms(photo)
     self.title = photo.title
     self.ext = photo.originalformat
     self.taken = photo.taken
@@ -124,6 +115,18 @@ class Photo(object):
     cache = PhotoCache.instance()
     if cache.has_cache(self.id, start, end):
       return cache.get(self.id, start, end)
+
+  def _get_unix_perms(self, photo):
+    perms = 0744
+    if photo.isfriend:
+      perms |= 0010
+    if photo.isfamily:
+      perms |= 0020
+    if photo.ispublic:
+      perms |= 0011
+    return perms
+
+
 
 
 class PhotoCache(object):
