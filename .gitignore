@@ -1,5 +1,6 @@
-.pyc
+*.pyc
+__init__.py
 
 # vim swap file
-.swo
-.swp
+*.swo
+*.swp
