@@ -29,13 +29,13 @@ def getTakenDate(photo):
   import time
   return time.mktime(time.strptime("%Y-%m-%d %H:%M:%S", photo.taken))
 
-def _get_unix_perms(photo):
+def _get_unix_perms(isfriend, isfamily, ispublic):
   perms = 0744
-  if photo.isfriend:
+  if isfriend:
     perms |= 0010
-  if photo.isfamily:
+  if isfamily:
     perms |= 0020
-  if photo.ispublic:
+  if ispublic:
     perms |= 0011
   return perms
 
@@ -100,10 +100,12 @@ class PhotoSyncer:
     current_page = 1
     while current_page <= pages:
       photos = self.user.getPhotos(per_page=500, page=current_page)
+      print photos
       pages = photos.info.pages
       for p in photos:
         if self.sync_callback:
-          self.sync_callback(Photo(id=p.id, title=p.title.encode('utf-8')))
+          self.sync_callback(Photo(id=p.id, title=p.title.encode('utf-8'),
+                                   mode=_get_unix_perms(p.isfriend, p.isfamily, p.ispublic)))
       current_page += 1
     log.info("populate_stream_thread end")
 
