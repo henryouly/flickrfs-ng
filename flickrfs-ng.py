@@ -11,12 +11,9 @@ from threading import Lock
 
 from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 import libs.python_flickr_api.flickr_api as fapi
-import libs.python_flickr_api.flickr_api.keys as fapi_keys
-from libs.python_flickr_api.flickr_api.auth import AuthHandler
 from i_node import INode, MODE_DIR, MODE_FILE
+from oauth_http_server import OAuthHTTPServer
 
-flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
-flickrSecret = "3fbf7144be7eca28"  # shared "secret"
 
 class Flickrfs(LoggingMixIn, Operations):
   def __init__(self):
@@ -42,16 +39,26 @@ class Flickrfs(LoggingMixIn, Operations):
     self.config_dir = os.path.join(self.home, '.flickrfs-ng')
     self.config_file = os.path.join(self.config_dir, 'config.txt')
     self.auth_file = os.path.join(self.config_dir, 'auth.txt')
-    fapi_keys.set_keys(api_key=flickrAPIKey, api_secret=flickrSecret)
+    self.browser = "/usr/bin/x-www-browser"
 
   def __auth(self):
+    print "Start authenticate..."
     if os.path.exists(self.auth_file):
-      a = AuthHandler.load(self.auth_file)
+      a = fapi.auth.AuthHandler.load(self.auth_file)
     else:
-      a = AuthHandler('http://localhost')
-      a.get_authorization_url('write')
-      a.write(self.auth_file)
+      server = OAuthHTTPServer()
+      a = fapi.auth.AuthHandler(callback='http://localhost:%d/verifier' %
+                                server.port)
+      os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
+      try:
+        server.serve_forever()
+      except:
+        # safely ignore
+        pass
+      a.set_verifier(server.oauth_verifier)
+      a.save(self.auth_file)
     fapi.set_auth_handler(a)
+    print "Authentication done."
 
   def getattr(self, path, fh=None):
     if path not in self.nodes.keys():
