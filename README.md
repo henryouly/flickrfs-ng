@@ -24,7 +24,7 @@ module is still quite out-of-date. flickrfs-ng will use fusepy instead to provid
 python binding.
 
 The original flickrapi is also out-of-maintain, and will be replaced with
-python-flickr-api which is in actively development.
+python-flickr-api which is in actively development and support OAuth.
 
 * python-flickr-api https://github.com/alexis-mignon/python-flickr-api/
 * fusepy https://github.com/terencehonles/fusepy
@@ -50,3 +50,6 @@ New features
 - Transparent resizing
   To get a smaller size of photo, just get
   /mnt/flickr/stream/P23012345.1024.JPG
+
+- OAuth
+  Use OAuth which is now the prefer way
