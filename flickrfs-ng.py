@@ -14,6 +14,7 @@ import libs.python_flickr_api.flickr_api as fapi
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
 from photo import PhotoStream
+from ConfigParser import ConfigParser
 
 
 class Flickrfs(LoggingMixIn, Operations):
@@ -56,6 +57,10 @@ class Flickrfs(LoggingMixIn, Operations):
     self.auth_file = os.path.join(self.config_dir, 'auth.txt')
     self.log_file = os.path.join(self.config_dir, 'flickrfs-ng.log')
     self.browser = "/usr/bin/x-www-browser"
+    if os.path.exists(self.config_file):
+      config = ConfigParser()
+      config.read(self.config_file)
+      self.browser = config.get('flickrfs-ng', 'browser')
 
   def __auth(self):
     print "Start authenticate..."
@@ -65,7 +70,10 @@ class Flickrfs(LoggingMixIn, Operations):
       server = OAuthHTTPServer()
       a = fapi.auth.AuthHandler(callback='http://localhost:%d/verifier' %
                                 server.port)
-      os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
+      pid = os.fork()
+      if pid == 0:
+        os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
+	exit(0)
       try:
         server.serve_forever()
       except IOError:
