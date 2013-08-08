@@ -10,7 +10,7 @@ from sys import argv, exit
 from threading import Lock
 
 from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
-import libs.python_flickr_api.flickr_api as fapi
+import libs.python_flickr_api.flickr_api as flickr 
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
 from photo import PhotoStream
@@ -26,7 +26,7 @@ class Flickrfs(LoggingMixIn, Operations):
     self.__init_fs()
     self.__auth()
     self.photo_stream = PhotoStream(self.nodes['/stream'], '/stream', self.user)
-    print "Initialized"
+    #self._get_photos()
 
   def __init_logging(self):
     logger = logging.getLogger()
@@ -38,7 +38,6 @@ class Flickrfs(LoggingMixIn, Operations):
     logger.setLevel(logging.INFO)
     self.logger = logging.getLogger('flickrfs-ng')
     self.logger.info("Logging initialized")
-
 
   def __init_fs(self):
     self.nodes['/'] = INode.root()
@@ -65,10 +64,10 @@ class Flickrfs(LoggingMixIn, Operations):
   def __auth(self):
     print "Start authenticate..."
     if os.path.exists(self.auth_file):
-      a = fapi.auth.AuthHandler.load(self.auth_file)
+      a = flickr.auth.AuthHandler.load(self.auth_file)
     else:
       server = OAuthHTTPServer()
-      a = fapi.auth.AuthHandler(callback='http://localhost:%d/verifier' %
+      a = flickr.auth.AuthHandler(callback='http://localhost:%d/verifier' %
                                 server.port)
       pid = os.fork()
       if pid == 0:
@@ -81,9 +80,9 @@ class Flickrfs(LoggingMixIn, Operations):
         pass
       a.set_verifier(server.oauth_verifier)
       a.save(self.auth_file)
-    fapi.set_auth_handler(a)
+    flickr.set_auth_handler(a)
     print "Login..."
-    self.user = fapi.test.login()
+    self.user = flickr.test.login()
     print "Authentication done."
 
   def _get_photos(self):
@@ -92,7 +91,7 @@ class Flickrfs(LoggingMixIn, Operations):
     print photos.info.page
     print photos.info.total
     for photo in photos:
-      print photo.id, photo.title
+      print photo.id, photo.title.encode('utf-8')
 
 
   def getattr(self, path, fh=None):

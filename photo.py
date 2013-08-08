@@ -4,7 +4,7 @@ import thread, threading
 from stat import S_IFREG
 from traceback import format_exc
 
-import libs.python_flickr_api.flickr_api as fapi
+import libs.python_flickr_api.flickr_api as flickr
 
 log = logging.getLogger('flickrfs-ng')
 
@@ -28,6 +28,17 @@ def getTakenDateStr(photo):
 def getTakenDate(photo):
   import time
   return time.mktime(time.strptime("%Y-%m-%d %H:%M:%S", photo.taken))
+
+def _get_unix_perms(photo):
+  perms = 0744
+  if photo.isfriend:
+    perms |= 0010
+  if photo.isfamily:
+    perms |= 0020
+  if photo.ispublic:
+    perms |= 0011
+  return perms
+
 
 class PhotoStream:
   def __init__(self, inode, path, user):
@@ -92,7 +103,7 @@ class PhotoSyncer:
       pages = photos.info.pages
       for p in photos:
         if self.sync_callback:
-          self.sync_callback(Photo(p))
+          self.sync_callback(Photo(id=p.id, title=p.title.encode('utf-8')))
       current_page += 1
     log.info("populate_stream_thread end")
 
@@ -106,30 +117,20 @@ class PhotoSyncer:
 
 
 class Photo(object):
-  def __init__(self, photo):
-    self.id = photo.id
-    self.title = photo.title.replace('/', '_')
+  def __init__(self, id, title, mtime=0, ctime=0, mode=0, ext='', taken=''):
+    self.id = id
+    self.title = title.replace('/', '_')
     self.filename = None
-    self.mtime = int(photo.lastupdate)
-    self.ctime = int(photo.dateuploaded)
-    self.mode = self._get_unix_perms(photo)
-    self.ext = photo.originalformat
-    self.taken = photo.taken
+    self.mtime = mtime
+    self.ctime = ctime
+    self.mode = mode
+    self.ext = ext
+    self.taken = taken
 
   def data(self, start=0, end=0):
     cache = PhotoCache.instance()
     if cache.has_cache(self.id, start, end):
       return cache.get(self.id, start, end)
-
-  def _get_unix_perms(self, photo):
-    perms = 0744
-    if photo.isfriend:
-      perms |= 0010
-    if photo.isfamily:
-      perms |= 0020
-    if photo.ispublic:
-      perms |= 0011
-    return perms
 
 
 
