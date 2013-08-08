@@ -85,10 +85,15 @@ class PhotoSyncer:
 
   def populate_stream_thread(self):
     log.info("populate_stream_thread start")
-    photos = self.user.getPhotos()
-    for p in photos:
-      if self.sync_callback:
-        self.sync_callback(Photo(p))
+    pages = 1
+    current_page = 1
+    while current_page <= pages:
+      photos = self.user.getPhotos(per_page=500, page=current_page)
+      pages = photos.info.pages
+      for p in photos:
+        if self.sync_callback:
+          self.sync_callback(Photo(p))
+      current_page += 1
     log.info("populate_stream_thread end")
 
   def update_stream_thread(self):
@@ -103,11 +108,11 @@ class PhotoSyncer:
 class Photo(object):
   def __init__(self, photo):
     self.id = photo.id
+    self.title = photo.title.replace('/', '_')
     self.filename = None
     self.mtime = int(photo.lastupdate)
     self.ctime = int(photo.dateuploaded)
     self.mode = self._get_unix_perms(photo)
-    self.title = photo.title
     self.ext = photo.originalformat
     self.taken = photo.taken
 

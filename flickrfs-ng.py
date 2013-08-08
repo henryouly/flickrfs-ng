@@ -87,7 +87,7 @@ class Flickrfs(LoggingMixIn, Operations):
     print "Authentication done."
 
   def _get_photos(self):
-    photos = self.user.getPhotos()
+    photos = self.user.getPhotos(per_page=500)
     print photos.info.pages
     print photos.info.page
     print photos.info.total
