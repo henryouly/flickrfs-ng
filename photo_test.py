@@ -32,7 +32,7 @@ class MockPhoto:
     return self.__dict__['attr'][key]
 
 class MockUser:
-  def getPhotos(self):
+  def getPhotos(self, *args, **kw):
     return [
         MockPhoto(id=1,lastupdate=1,dateuploaded=1,title="Photo 1",originalformat='jpg',
                   taken='2001-01-01 01:01:01',ispublic=1,isfamily=1,isfriend=1),
