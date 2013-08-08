@@ -113,8 +113,6 @@ class Photo(object):
   def __init__(self, photo):
     self.id = photo.id
     self.filename = None
-    info = photo.getInfo()
-    print info
     self.mtime = int(photo.lastupdate)
     self.ctime = int(photo.dateuploaded)
     self.mode = getUnixPerms(photo)
