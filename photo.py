@@ -1,4 +1,5 @@
 import anydbm
+import contextlib
 import logging
 import thread, threading
 import urllib
@@ -67,13 +68,15 @@ class PhotoStream:
   def read(self, path, size, offset):
     (parent, base) = path.rsplit('/', 1)
     assert parent == self.path
-    return self.photos[base].data(offset, offset + size)
+    return self.photos[base].get_data(offset, offset + size)
 
   def prefetch_file(self, path):
     (parent, base) = path.rsplit('/', 1)
     assert parent == self.path
-    if base in self.photos:
-      self.syncer.start_prefetch_thread(self.photos[base])
+    photo = self.photos.get(base, None)
+    if photo:
+      photo.fetch_size()
+      self.syncer.start_prefetch_thread(photo)
 
   def file_list(self):
     return self.photos.keys()
@@ -122,17 +125,20 @@ class PhotoSyncer:
 
   def prefetch_file_thread(self, photo):
     log.info("prefetch_file_thread start, filename: " + photo.filename)
-    photo.fetch_size()
+    with contextlib.closing(urllib.urlopen(photo.url)) as d:
+      photo.data = d.read()
 
   def _run_in_background(self, func, *args, **kw):
-    thread.start_new_thread(_log_exception_wrapper, (func,) + args, kw)
+    t = threading.Thread(target=_log_exception_wrapper, args=(func,) + args)
+    t.start()
+    return t
 
   def start_sync_thread(self):
-    self._run_in_background(self.populate_stream_thread)
+    return self._run_in_background(self.populate_stream_thread)
 
   def start_prefetch_thread(self, photo):
-    self._run_in_background(self.prefetch_file_thread, photo)
-
+    if len(photo.data) == 0:
+      photo.data_fetching_thread = self._run_in_background(self.prefetch_file_thread, photo)
 
 
 class Photo(object):
@@ -148,21 +154,24 @@ class Photo(object):
     self.filename = None
     self.inode = None
     self.size = 0
+    self.data = []
+    self.data_fetching_thread = None
 
   def fetch_size(self):
     if self.size == 0:
       assert len(self.url) > 0
-      d = urllib.urlopen(self.url)
-      self.size = int(d.info()['Content-Length'])
+      with contextlib.closing(urllib.urlopen(self.url)) as d:
+        self.size = int(d.info()['Content-Length'])
     self.inode['st_size'] = self.size
 
-  def data(self, start=0, end=0):
-    log.info("data")
-    return "Hello"
+  def get_data(self, start=0, end=0):
+    if self.data_fetching_thread:
+      self.data_fetching_thread.join()
+      self.data_fetching_thread = None
+    return self.data[start:end]
     cache = PhotoCache.instance()
     if cache.has_cache(self.id, start, end):
       return cache.get(self.id, start, end)
-
 
 
 class PhotoCache(object):
@@ -178,6 +187,17 @@ class PhotoCache(object):
     if not db.has_key(key):
       return False
 
+  def __getitem__(self, key, default=None):
+    if not self.has_key(key):
+      return default
+    return cPickle.loads(self.db.get(str(key)))
+
+  def __setitem__(self, key, value):
+    self.keys.add(key)
+    self.db[str(key)] = cPickle.dumps(value)
+
+  def keys(self):
+    return list(self.keys)
 
   @staticmethod
   def set_cache_file(file):

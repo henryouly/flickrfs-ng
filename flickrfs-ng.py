@@ -13,7 +13,7 @@ from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 import libs.python_flickr_api.flickr_api as flickr
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
-from photo import PhotoStream
+from photo import PhotoStream, PhotoCache
 from ConfigParser import ConfigParser
 
 
@@ -53,7 +53,9 @@ class Flickrfs(LoggingMixIn, Operations):
     self.config_dir = os.path.join(self.home, '.flickrfs-ng')
     self.config_file = os.path.join(self.config_dir, 'config.txt')
     self.auth_file = os.path.join(self.config_dir, 'auth.txt')
+    self.cache_file = os.path.join(self.config_dir, 'cache.db')
     self.log_file = os.path.join(self.config_dir, 'flickrfs-ng.log')
+    PhotoCache.set_cache_file(self.cache_file)
     self.browser = "/usr/bin/x-www-browser"
     if os.path.exists(self.config_file):
       config = ConfigParser()
