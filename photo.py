@@ -111,13 +111,19 @@ class PhotoSyncer:
     log.info("populate_stream_thread start")
     pages = 1
     current_page = 1
+    all_photos = []
     while current_page <= pages:
       photos = self.user.getPhotos(per_page=500, page=current_page,
                                    extras="original_format,last_update,date_upload,date_taken,url_o")
       pages = photos.info.pages
       for p in photos:
-        self.add_photo_func(Photo(p))
+        photo = Photo(p)
+        self.add_photo_func(photo)
+        all_photos.append(photo)
       current_page += 1
+    log.info("populate_stream_thread update sizes")
+    for photo in all_photos:
+      photo.fetch_size()
     log.info("populate_stream_thread end")
 
   def prefetch_file_thread(self, photo):
