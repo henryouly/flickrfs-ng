@@ -31,22 +31,35 @@ class MockPhoto:
   def __getattr__(self, key):
     return self.__dict__['attr'][key]
 
+class MockPhotoInfo:
+  def __init__(self):
+    self.pages = 1
+
+class MockPhotos:
+  def __init__(self):
+    self.photos = [
+        MockPhoto(id=1,lastupdate=1,dateupload=1,title="Photo 1",originalformat='jpg',
+                  datetaken='2001-01-01 01:01:01',ispublic=1,isfamily=1,isfriend=1),
+        MockPhoto(id=2,lastupdate=2,dateupload=2,title="Photo 2",originalformat='png',
+                  datetaken='2001-01-01 01:01:01',ispublic=0,isfamily=1,isfriend=1),
+        MockPhoto(id=3,lastupdate=2,dateupload=2,title="",originalformat='png',
+                  datetaken='2001-01-01 01:01:01',ispublic=1,isfamily=0,isfriend=0),
+        MockPhoto(id=4,lastupdate=2,dateupload=2,title="",originalformat='png',
+                  datetaken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=1),
+        MockPhoto(id=5,lastupdate=2,dateupload=2,title="",originalformat='png',
+                  datetaken='2001-01-01 01:01:01',ispublic=0,isfamily=1,isfriend=0),
+        MockPhoto(id=6,lastupdate=2,dateupload=1,title="P6",originalformat='png',
+                  datetaken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=0),
+    ]
+    self.info = MockPhotoInfo()
+
+  def __getitem__(self, key):
+    return self.photos.__getitem__(key)
+
+
 class MockUser:
   def getPhotos(self, *args, **kw):
-    return [
-        MockPhoto(id=1,lastupdate=1,dateuploaded=1,title="Photo 1",originalformat='jpg',
-                  taken='2001-01-01 01:01:01',ispublic=1,isfamily=1,isfriend=1),
-        MockPhoto(id=2,lastupdate=2,dateuploaded=2,title="Photo 2",originalformat='png',
-                  taken='2001-01-01 01:01:01',ispublic=0,isfamily=1,isfriend=1),
-        MockPhoto(id=3,lastupdate=2,dateuploaded=2,title="",originalformat='png',
-                  taken='2001-01-01 01:01:01',ispublic=1,isfamily=0,isfriend=0),
-        MockPhoto(id=4,lastupdate=2,dateuploaded=2,title="",originalformat='png',
-                  taken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=1),
-        MockPhoto(id=5,lastupdate=2,dateuploaded=2,title="",originalformat='png',
-                  taken='2001-01-01 01:01:01',ispublic=0,isfamily=1,isfriend=0),
-        MockPhoto(id=6,lastupdate=2,dateuploaded=1,title="P6",originalformat='png',
-                  taken='2001-01-01 01:01:01',ispublic=0,isfamily=0,isfriend=0),
-    ]
+    return MockPhotos()
 
 class PhotoStreamTest(unittest.TestCase):
 
