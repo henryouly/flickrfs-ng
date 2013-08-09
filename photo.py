@@ -51,9 +51,7 @@ class PhotoStream:
   def add_photo(self, photo):
     photo.filename = self._get_filename(photo)
     log.info("adding photo " + photo.filename)
-    p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode,
-                              st_mtime = photo.mtime,
-                              st_ctime = photo.ctime)
+    p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode)
     self.photos[photo.filename] = p_node
 
 
@@ -103,8 +101,7 @@ class PhotoSyncer:
       pages = photos.info.pages
       for p in photos:
         if self.sync_callback:
-          self.sync_callback(Photo(id=p.id, title=p.title,
-                                   mode=_get_unix_perms(p.isfriend, p.isfamily, p.ispublic)))
+          self.sync_callback(Photo(p))
       current_page += 1
     log.info("populate_stream_thread end")
 
@@ -118,15 +115,13 @@ class PhotoSyncer:
 
 
 class Photo(object):
-  def __init__(self, id, title, mtime=0, ctime=0, mode=0, ext='', taken=''):
-    self.id = id
-    self.title = title.replace('/', '_')
+  def __init__(self, photo):
+    self.id = photo.id
+    self.title = photo.title.replace('/', '_')
     self.filename = None
-    self.mtime = mtime
-    self.ctime = ctime
-    self.mode = mode
-    self.ext = ext
-    self.taken = taken
+    self.mode = _get_unix_perms(photo.isfriend, photo.isfamily, photo.ispublic)
+    self.ext = 'jpg'
+    self.taken = ''
 
   def data(self, start=0, end=0):
     cache = PhotoCache.instance()
