@@ -72,7 +72,7 @@ class Flickrfs(LoggingMixIn, Operations):
       pid = os.fork()
       if pid == 0:
         os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
-	exit(0)
+        exit(0)
       try:
         server.serve_forever()
       except IOError:

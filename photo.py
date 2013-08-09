@@ -100,11 +100,10 @@ class PhotoSyncer:
     current_page = 1
     while current_page <= pages:
       photos = self.user.getPhotos(per_page=500, page=current_page)
-      print photos
       pages = photos.info.pages
       for p in photos:
         if self.sync_callback:
-          self.sync_callback(Photo(id=p.id, title=p.title.encode('utf-8'),
+          self.sync_callback(Photo(id=p.id, title=p.title,
                                    mode=_get_unix_perms(p.isfriend, p.isfamily, p.ispublic)))
       current_page += 1
     log.info("populate_stream_thread end")
