@@ -115,19 +115,23 @@ class Flickrfs(LoggingMixIn, Operations):
   def read(self, path, size, offset, fh):
     log.info("%s offset %s length %s", path, offset, size)
     if path.startswith('/stream'):
-      return self.photo_stream.read(path, size, offset)
+      (parent, base) = path.rsplit('/', 1)
+      assert parent == self.photo_stream.path
+      return self.photo_stream.read(base, size, offset)
 
   def open(self, path, flags):
     # if open is called with read flag, it should notify the photo_stream to
     # prefetch file content
     log.info("path: %s flags: %d" % (path, flags))
     if path.startswith('/stream'):
-      self.photo_stream.prefetch_file(path)
+      (parent, base) = path.rsplit('/', 1)
+      assert parent == self.photo_stream.path
+      if base not in self.photo_stream.file_list():
+        raise FuseOSError(ENOENT)
+      self.photo_stream.prefetch_file(base)
+      log.info("file size: %d" % self.photo_stream.photos[base].inode['st_size'])
     self.fd += 1
     return self.fd
-
-  def statfs(self, path):
-    return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
 
 if __name__ == '__main__':

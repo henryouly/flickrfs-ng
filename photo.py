@@ -1,4 +1,5 @@
 import anydbm
+import cPickle
 import contextlib
 import logging
 import thread, threading
@@ -65,18 +66,14 @@ class PhotoStream:
       return None
     return self.photos[base].inode.getattrs()
 
-  def read(self, path, size, offset):
-    (parent, base) = path.rsplit('/', 1)
-    assert parent == self.path
+  def read(self, base, size, offset):
     return self.photos[base].get_data(offset, offset + size)
 
-  def prefetch_file(self, path):
-    (parent, base) = path.rsplit('/', 1)
-    assert parent == self.path
+  def prefetch_file(self, base):
     photo = self.photos.get(base, None)
-    if photo:
-      photo.fetch_size()
-      self.syncer.start_prefetch_thread(photo)
+    assert photo
+    photo.fetch_size()
+    self.syncer.start_prefetch_thread(photo)
 
   def file_list(self):
     return self.photos.keys()
@@ -126,7 +123,9 @@ class PhotoSyncer:
   def prefetch_file_thread(self, photo):
     log.info("prefetch_file_thread start, filename: " + photo.filename)
     with contextlib.closing(urllib.urlopen(photo.url)) as d:
-      photo.data = d.read()
+      data = d.read()
+      cache = PhotoCache()
+      cache[photo.id] = data
 
   def _run_in_background(self, func, *args, **kw):
     t = threading.Thread(target=_log_exception_wrapper, args=(func,) + args)
@@ -137,7 +136,8 @@ class PhotoSyncer:
     return self._run_in_background(self.populate_stream_thread)
 
   def start_prefetch_thread(self, photo):
-    if len(photo.data) == 0:
+    cache = PhotoCache()
+    if photo.id not in cache.keys():
       photo.data_fetching_thread = self._run_in_background(self.prefetch_file_thread, photo)
 
 
@@ -154,7 +154,6 @@ class Photo(object):
     self.filename = None
     self.inode = None
     self.size = 0
-    self.data = []
     self.data_fetching_thread = None
 
   def fetch_size(self):
@@ -165,47 +164,61 @@ class Photo(object):
     self.inode['st_size'] = self.size
 
   def get_data(self, start=0, end=0):
-    if self.data_fetching_thread:
+    cache = PhotoCache()
+    if self.id not in cache.keys():
+      assert self.data_fetching_thread
       self.data_fetching_thread.join()
+      log.info("joined prefetch_file_thread")
       self.data_fetching_thread = None
-    return self.data[start:end]
-    cache = PhotoCache.instance()
-    if cache.has_cache(self.id, start, end):
-      return cache.get(self.id, start, end)
+      assert self.id in cache.keys()
+    data = cache[self.id]
+    assert data
+    if end == 0:
+      return data[start:]
+    else:
+      return data[start:end]
 
 
 class PhotoCache(object):
-  instance = None
   cache_file = None
+  _instance = None
 
-  def __init__(self, cache_file):
+  def __new__(class_, *args, **kwargs):
+    if not isinstance(class_._instance, class_):
+        class_._instance = object.__new__(class_, *args, **kwargs)
+        class_._instance.__init_once__()
+    return class_._instance
+
+  def __init_once__(self, max_items=10):
     assert PhotoCache.cache_file is not None
     self.db = anydbm.open(PhotoCache.cache_file, flag='c')
-    self.keys = set()
-
-  def has_cache(self, key, start, end):
-    if not db.has_key(key):
-      return False
+    self._key_order = self.db.keys()
+    self._max_items = max_items
 
   def __getitem__(self, key, default=None):
-    if not self.has_key(key):
+    if key not in self._key_order:
       return default
-    return cPickle.loads(self.db.get(str(key)))
+    self.__mark(key)
+    v = self.db.get(str(key))
+    return cPickle.loads(v)
 
   def __setitem__(self, key, value):
-    self.keys.add(key)
     self.db[str(key)] = cPickle.dumps(value)
+    self.__mark(key)
+
+  def __mark(self, key):
+    if key in self._key_order:
+      self._key_order.remove(key)
+
+    self._key_order.insert(0, key)
+    if len(self._key_order) > self._max_items:
+      remove_key = self._key_order[self._max_items]
+      del self.db[str(remove_key)]
+      self._key_order.remove(remove_key)
 
   def keys(self):
-    return list(self.keys)
+    return sorted(self._key_order)
 
   @staticmethod
   def set_cache_file(file):
     PhotoCache.cache_file = file
-
-  @staticmethod
-  def instance():
-    if not isinstance(PhotoCache._instance, PhotoCache):
-      PhotoCache.instance = PhotoCache()
-      return PhotoCache.instance
-
