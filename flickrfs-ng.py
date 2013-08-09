@@ -72,7 +72,9 @@ class Flickrfs(LoggingMixIn, Operations):
                                 server.port)
       pid = os.fork()
       if pid == 0:
-        os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
+        import webbrowser
+        webbrowser.open(a.get_authorization_url('write'))
+        #os.system("%s '%s'" % (self.browser, a.get_authorization_url('write')))
         exit(0)
       try:
         server.serve_forever()
