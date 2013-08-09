@@ -1,6 +1,7 @@
 import anydbm
 import logging
 import thread, threading
+import urllib
 from stat import S_IFREG
 from traceback import format_exc
 
@@ -121,7 +122,7 @@ class PhotoSyncer:
 
   def prefetch_file_thread(self, photo):
     log.info("prefetch_file_thread start, filename: " + photo.filename)
-    photo.get_size()
+    photo.fetch_size()
 
   def _run_in_background(self, func, *args, **kw):
     thread.start_new_thread(_log_exception_wrapper, (func,) + args, kw)
@@ -148,10 +149,9 @@ class Photo(object):
     self.inode = None
     self.size = 0
 
-  def get_size(self):
+  def fetch_size(self):
     if self.size == 0:
       assert len(self.url) > 0
-      import urllib
       d = urllib.urlopen(self.url)
       self.size = int(d.info()['Content-Length'])
     self.inode['st_size'] = self.size
