@@ -4,6 +4,3 @@
 [submodule "libs/python_flickr_api"]
 	path = libs/python_flickr_api
 	url = git://github.com/alexis-mignon/python-flickr-api.git
-[submodule "libs/requests"]
-	path = libs/requests
-	url = git://github.com/kennethreitz/requests.git
