@@ -10,7 +10,7 @@ from sys import argv, exit
 from threading import Lock
 
 from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
-import libs.python_flickr_api.flickr_api as flickr 
+import libs.python_flickr_api.flickr_api as flickr
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
 from photo import PhotoStream
@@ -26,6 +26,7 @@ class Flickrfs(LoggingMixIn, Operations):
     self.__init_fs()
     self.__auth()
     self.photo_stream = PhotoStream(self.nodes['/stream'], '/stream', self.user)
+    self.fd = 0
     #self._get_photos()
 
   def __init_logging(self):
@@ -36,8 +37,6 @@ class Flickrfs(LoggingMixIn, Operations):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
-    self.logger = logging.getLogger('flickrfs-ng')
-    self.logger.info("Logging initialized")
 
   def __init_fs(self):
     self.nodes['/'] = INode.root()
@@ -95,7 +94,10 @@ class Flickrfs(LoggingMixIn, Operations):
 
   def getattr(self, path, fh=None):
     if path.startswith('/stream/'):
-      return self.photo_stream.getattr(path, fh)
+      attr = self.photo_stream.getattr(path, fh)
+      if not attr:
+        raise FuseOSError(ENOENT)
+      return attr
     if path not in self.nodes.keys():
       raise FuseOSError(ENOENT)
     return self.nodes[path].getattrs()
@@ -109,7 +111,21 @@ class Flickrfs(LoggingMixIn, Operations):
     return [t[1] for t in p if t[0] == path and len(t[1]) > 0] + ['.', '..']
 
   def read(self, path, size, offset, fh):
-    log.debug("%s offset %s length %s", path, offset, size)
+    log.info("%s offset %s length %s", path, offset, size)
+    if path.startswith('/stream'):
+      return self.photo_stream.read(path, size, offset)
+
+  def open(self, path, flags):
+    # if open is called with read flag, it should notify the photo_stream to
+    # prefetch file content
+    log.info("path: %s flags: %d" % (path, flags))
+    if path.startswith('/stream'):
+      self.photo_stream.prefetch_file(path)
+    self.fd += 1
+    return self.fd
+
+  def statfs(self, path):
+    return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
 
 if __name__ == '__main__':

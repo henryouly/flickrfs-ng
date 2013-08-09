@@ -59,7 +59,20 @@ class PhotoStream:
   def getattr(self, path, fh=None):
     (parent, base) = path.rsplit('/', 1)
     assert parent == self.path
+    if base not in self.photos:
+      return None
     return self.photos[base].inode.getattrs()
+
+  def read(self, path, size, offset):
+    (parent, base) = path.rsplit('/', 1)
+    assert parent == self.path
+    return self.photos[base].data(offset, offset + size)
+
+  def prefetch_file(self, path):
+    (parent, base) = path.rsplit('/', 1)
+    assert parent == self.path
+    if base in self.photos:
+      self.syncer.start_prefetch_thread(self.photos[base])
 
   def file_list(self):
     return self.photos.keys()
@@ -88,9 +101,9 @@ class PhotoStream:
 
 
 class PhotoSyncer:
-  def __init__(self, user, photo_sync_callback, sync_interval=300):
+  def __init__(self, user, add_photo, sync_interval=300):
     self.user = user
-    self.sync_callback = photo_sync_callback
+    self.add_photo_func = add_photo
     self.sync_interval = sync_interval
 
   def populate_stream_thread(self):
@@ -99,21 +112,26 @@ class PhotoSyncer:
     current_page = 1
     while current_page <= pages:
       photos = self.user.getPhotos(per_page=500, page=current_page,
-                                   extras="original_format,last_update,date_upload,date_taken")
+                                   extras="original_format,last_update,date_upload,date_taken,url_o")
       pages = photos.info.pages
       for p in photos:
-        if self.sync_callback:
-          self.sync_callback(Photo(p))
+        self.add_photo_func(Photo(p))
       current_page += 1
     log.info("populate_stream_thread end")
 
-  def update_stream_thread(self):
-    # To implement
-    pass
+  def prefetch_file_thread(self, photo):
+    log.info("prefetch_file_thread start, filename: " + photo.filename)
+    photo.get_size()
+
+  def _run_in_background(self, func, *args, **kw):
+    thread.start_new_thread(_log_exception_wrapper, (func,) + args, kw)
 
   def start_sync_thread(self):
-    thread.start_new_thread(_log_exception_wrapper,
-                            (self.populate_stream_thread, ))
+    self._run_in_background(self.populate_stream_thread)
+
+  def start_prefetch_thread(self, photo):
+    self._run_in_background(self.prefetch_file_thread, photo)
+
 
 
 class Photo(object):
@@ -125,14 +143,25 @@ class Photo(object):
     self.taken = photo.datetaken
     self.upload = int(photo.dateupload)
     self.update = photo.lastupdate
+    self.url = photo.url_o
     self.filename = None
     self.inode = None
+    self.size = 0
+
+  def get_size(self):
+    if self.size == 0:
+      assert len(self.url) > 0
+      import urllib
+      d = urllib.urlopen(self.url)
+      self.size = int(d.info()['Content-Length'])
+    self.inode['st_size'] = self.size
 
   def data(self, start=0, end=0):
+    log.info("data")
+    return "Hello"
     cache = PhotoCache.instance()
     if cache.has_cache(self.id, start, end):
       return cache.get(self.id, start, end)
-
 
 
 
