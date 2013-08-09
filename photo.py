@@ -51,7 +51,9 @@ class PhotoStream:
   def add_photo(self, photo):
     photo.filename = self._get_filename(photo)
     log.info("adding photo " + photo.filename)
-    p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode)
+    p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode,
+                              st_ctime = photo.upload,
+                              st_mtime = photo.update)
     self.photos[photo.filename] = p_node
 
 
@@ -97,7 +99,8 @@ class PhotoSyncer:
     pages = 1
     current_page = 1
     while current_page <= pages:
-      photos = self.user.getPhotos(per_page=500, page=current_page)
+      photos = self.user.getPhotos(per_page=500, page=current_page,
+                                   extras="original_format,last_update,date_upload,date_taken")
       pages = photos.info.pages
       for p in photos:
         if self.sync_callback:
@@ -120,8 +123,10 @@ class Photo(object):
     self.title = photo.title.replace('/', '_')
     self.filename = None
     self.mode = _get_unix_perms(photo.isfriend, photo.isfamily, photo.ispublic)
-    self.ext = 'jpg'
-    self.taken = ''
+    self.ext = photo.originalformat
+    self.taken = photo.datetaken
+    self.upload = int(photo.dateupload)
+    self.update = photo.lastupdate
 
   def data(self, start=0, end=0):
     cache = PhotoCache.instance()
