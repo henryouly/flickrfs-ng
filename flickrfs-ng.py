@@ -93,7 +93,6 @@ class Flickrfs(LoggingMixIn, Operations):
     for photo in photos:
       print photo.id, photo.title.encode('utf-8')
 
-
   def getattr(self, path, fh=None):
     if path.startswith('/stream/'):
       return self.photo_stream.getattr(path, fh)

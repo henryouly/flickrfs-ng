@@ -78,20 +78,20 @@ class PhotoStreamTest(unittest.TestCase):
     self.assertTrue('P6.png' in self.pstream.photos.keys())
     self.assertFalse('Photo 3.png' in self.pstream.photos.keys())
     self.assertFalse('2001-01-01 003.png' in self.pstream.photos.keys())
-    self.assertEqual(self.pstream.photos['Photo 1.jpg']['st_mode'],
+    self.assertEqual(self.pstream.photos['Photo 1.jpg'].inode['st_mode'],
                      S_IFREG | 0775)
-    self.assertEqual(self.pstream.photos['Photo 2.png']['st_mode'],
+    self.assertEqual(self.pstream.photos['Photo 2.png'].inode['st_mode'],
                      S_IFREG | 0774)
-    self.assertEqual(self.pstream.photos['2001-01-01.png']['st_mode'],
+    self.assertEqual(self.pstream.photos['2001-01-01.png'].inode['st_mode'],
                      S_IFREG | 0755)
-    self.assertEqual(self.pstream.photos['2001-01-01 001.png']['st_mode'],
+    self.assertEqual(self.pstream.photos['2001-01-01 001.png'].inode['st_mode'],
                      S_IFREG | 0754)
-    self.assertEqual(self.pstream.photos['2001-01-01 002.png']['st_mode'],
+    self.assertEqual(self.pstream.photos['2001-01-01 002.png'].inode['st_mode'],
                      S_IFREG | 0764)
-    self.assertEqual(self.pstream.photos['P6.png']['st_mode'],
+    self.assertEqual(self.pstream.photos['P6.png'].inode['st_mode'],
                      S_IFREG | 0744)
-    self.assertEqual(self.pstream.photos['P6.png']['st_mtime'],2)
-    self.assertEqual(self.pstream.photos['P6.png']['st_ctime'],1)
+    self.assertEqual(self.pstream.photos['P6.png'].inode['st_mtime'],2)
+    self.assertEqual(self.pstream.photos['P6.png'].inode['st_ctime'],1)
 
 
 if __name__ == '__main__':

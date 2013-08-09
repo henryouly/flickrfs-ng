@@ -42,7 +42,7 @@ def _get_unix_perms(isfriend, isfamily, ispublic):
 
 class PhotoStream:
   def __init__(self, inode, path, user):
-    self.inode = inode
+    self.stream_inode = inode
     self.path = path
     self.photos = dict()
     self.syncer = PhotoSyncer(user, self.add_photo)
@@ -51,16 +51,15 @@ class PhotoStream:
   def add_photo(self, photo):
     photo.filename = self._get_filename(photo)
     log.info("adding photo " + photo.filename)
-    p_node = self.inode.mknod(st_mode = S_IFREG | photo.mode,
-                              st_ctime = photo.upload,
-                              st_mtime = photo.update)
-    self.photos[photo.filename] = p_node
-
+    photo.inode = self.stream_inode.mknod(st_mode = S_IFREG | photo.mode,
+                                          st_ctime = photo.upload,
+                                          st_mtime = photo.update)
+    self.photos[photo.filename] = photo
 
   def getattr(self, path, fh=None):
     (parent, base) = path.rsplit('/', 1)
     assert parent == self.path
-    return self.photos[base].getattrs()
+    return self.photos[base].inode.getattrs()
 
   def file_list(self):
     return self.photos.keys()
@@ -121,12 +120,13 @@ class Photo(object):
   def __init__(self, photo):
     self.id = photo.id
     self.title = photo.title.replace('/', '_')
-    self.filename = None
     self.mode = _get_unix_perms(photo.isfriend, photo.isfamily, photo.ispublic)
     self.ext = photo.originalformat
     self.taken = photo.datetaken
     self.upload = int(photo.dateupload)
     self.update = photo.lastupdate
+    self.filename = None
+    self.inode = None
 
   def data(self, start=0, end=0):
     cache = PhotoCache.instance()
