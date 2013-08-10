@@ -53,7 +53,7 @@ class Flickrfs(LoggingMixIn, Operations):
     self.config_dir = os.path.join(self.home, '.flickrfs-ng')
     self.config_file = os.path.join(self.config_dir, 'config.txt')
     self.auth_file = os.path.join(self.config_dir, 'auth.txt')
-    self.cache_file = os.path.join(self.config_dir, 'cache.db')
+    self.cache_file = os.path.join(self.config_dir, 'cache')
     self.log_file = os.path.join(self.config_dir, 'flickrfs-ng.log')
     PhotoCache.set_cache_file(self.cache_file)
     self.browser = "/usr/bin/x-www-browser"

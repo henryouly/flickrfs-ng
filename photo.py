@@ -4,6 +4,7 @@ import contextlib
 import logging
 import thread, threading
 import urllib
+import os
 from stat import S_IFREG
 from traceback import format_exc
 from collections import defaultdict
@@ -54,7 +55,7 @@ def set_photo_size():
   while True:
     (photo, size) = (yield)
     photo.inode['st_size'] = photo.size = size
-    log.info("url:%s size:%d" % (photo.url, size))
+    log.debug("url:%s size:%d" % (photo.url, size))
 
 def fetch_photo_size(photos, coroutine):
   s = requests.Session()
@@ -79,7 +80,6 @@ class PhotoStream:
 
   def add_photo(self, photo):
     photo.filename = self._get_filename(photo)
-    log.info("adding photo " + photo.filename)
     photo.inode = self.stream_inode.mknod(st_mode = S_IFREG | photo.mode,
                                           st_ctime = photo.upload,
                                           st_mtime = photo.update)
@@ -98,8 +98,7 @@ class PhotoStream:
   def prefetch_file(self, base):
     photo = self.photos.get(base, None)
     assert photo
-    photo.fetch_size()
-    self.syncer.start_prefetch_thread(photo)
+    photo.prefetch_file_data()
 
   def file_list(self):
     return self.photos.keys()
@@ -168,10 +167,10 @@ class PhotoSyncer:
   def start_sync_thread(self):
     return self._run_in_background(self.populate_stream_thread)
 
-  def start_prefetch_thread(self, photo):
-    cache = PhotoCache()
-    if photo.id not in cache.keys():
-      photo.data_fetching_thread = self._run_in_background(self.prefetch_file_thread, photo)
+  #def start_prefetch_thread(self, photo):
+  #  cache = PhotoCache()
+  #  if photo.id not in cache.keys():
+  #    photo.data_fetching_thread = self._run_in_background(self.prefetch_file_thread, photo)
 
 
 class Photo(object):
@@ -200,14 +199,33 @@ class Photo(object):
       log.info('size: %d' % self.size)
     self.inode['st_size'] = self.size
 
+  def read_file(self):
+    cache = PhotoCache()
+    log.info("read_file")
+    data = (yield)
+    cache[self.id] = data
+    log.info("read_file done")
+    yield len(data)
+
+  def fetch_file(self, read):
+    r = requests.get(self.url)
+    assert r.status_code == 200
+    yield read.send(r.content)
+
+  def prefetch_file_data(self):
+    self.fetch_size()
+
   def get_data(self, start=0, end=0):
     cache = PhotoCache()
     if self.id not in cache.keys():
-      assert self.data_fetching_thread
-      self.data_fetching_thread.join()
-      log.info("joined prefetch_file_thread")
-      self.data_fetching_thread = None
+      read_file = self.read_file()
+      read_file.next()
+      fetch_file = self.fetch_file(read_file)
+      size = fetch_file.next()
+      log.info("fetch_file done, %d" % size)
       assert self.id in cache.keys()
+      fetch_file.close()
+      read_file.close()
     data = cache[self.id]
     assert data
     if end == 0:
@@ -228,7 +246,7 @@ class PhotoCache(object):
 
   def __init_once__(self, max_items=10):
     assert PhotoCache.cache_file is not None
-    self.db = anydbm.open(PhotoCache.cache_file, flag='c')
+    self.db = anydbm.open(PhotoCache.cache_file, flag='n')
     self._key_order = self.db.keys()
     self._max_items = max_items
 
