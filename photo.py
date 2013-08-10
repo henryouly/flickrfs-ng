@@ -6,8 +6,10 @@ import thread, threading
 import urllib
 from stat import S_IFREG
 from traceback import format_exc
+from collections import defaultdict
 
-import libs.python_flickr_api.flickr_api as flickr
+from libs.python_flickr_api import flickr_api as flickr
+from libs.requests import requests
 
 log = logging.getLogger('flickrfs-ng')
 
@@ -42,6 +44,23 @@ def _get_unix_perms(isfriend, isfamily, ispublic):
     perms |= 0011
   return perms
 
+def photo_url_reducer(url_dict, photo):
+  from urlparse import urlparse
+  o = urlparse(photo.url)
+  url_dict[o.hostname].append(photo)
+  return url_dict
+
+def fetch_photo_size_thread(photos):
+  s = requests.Session()
+  for photo in photos:
+    r = s.head(photo.url)
+    size = int(r.headers.get('content-length'))
+    photo.inode['st_size'] = size
+    log.info("url:%s size:%d" % (photo.url, size))
+
+def _batch_fetch_size(photo_list):
+  photo_group = reduce(photo_url_reducer, photo_list, defaultdict(list))
+  [thread.start_new_thread(fetch_photo_size_thread, (photo_group[k], )) for k in photo_group.keys()]
 
 class PhotoStream:
   def __init__(self, inode, path, user):
@@ -122,8 +141,9 @@ class PhotoSyncer:
         all_photos.append(photo)
       current_page += 1
     log.info("populate_stream_thread update sizes")
-    for photo in all_photos:
-      photo.fetch_size()
+    _batch_fetch_size(all_photos)
+    #for photo in all_photos:
+    #  photo.fetch_size()
     log.info("populate_stream_thread end")
 
   def prefetch_file_thread(self, photo):
@@ -165,8 +185,12 @@ class Photo(object):
   def fetch_size(self):
     if self.size == 0:
       assert len(self.url) > 0
+      #r = requests.head(self.url, timeout=2.0)
+      #self.size = int(r.headers['content-length'])
+      log.info('requesting ' + self.url)
       with contextlib.closing(urllib.urlopen(self.url)) as d:
         self.size = int(d.info()['Content-Length'])
+      log.info('size: %d' % self.size)
     self.inode['st_size'] = self.size
 
   def get_data(self, start=0, end=0):

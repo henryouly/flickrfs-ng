@@ -10,7 +10,7 @@ from sys import argv, exit
 from threading import Lock
 
 from libs.fusepy.fuse import FUSE, FuseOSError, Operations, LoggingMixIn
-import libs.python_flickr_api.flickr_api as flickr
+from libs.python_flickr_api import flickr_api as flickr
 from i_node import INode, MODE_DIR, MODE_FILE
 from oauth_http_server import OAuthHTTPServer
 from photo import PhotoStream, PhotoCache
