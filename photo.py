@@ -50,17 +50,24 @@ def photo_url_reducer(url_dict, photo):
   url_dict[o.hostname].append(photo)
   return url_dict
 
-def fetch_photo_size_thread(photos):
+def set_photo_size():
+  while True:
+    (photo, size) = (yield)
+    photo.inode['st_size'] = photo.size = size
+    log.info("url:%s size:%d" % (photo.url, size))
+
+def fetch_photo_size(photos, coroutine):
   s = requests.Session()
+  coroutine.next()
   for photo in photos:
     r = s.head(photo.url)
     size = int(r.headers.get('content-length'))
-    photo.inode['st_size'] = size
-    log.info("url:%s size:%d" % (photo.url, size))
+    coroutine.send((photo, size))
+  coroutine.close()
 
 def _batch_fetch_size(photo_list):
   photo_group = reduce(photo_url_reducer, photo_list, defaultdict(list))
-  [thread.start_new_thread(fetch_photo_size_thread, (photo_group[k], )) for k in photo_group.keys()]
+  [thread.start_new_thread(fetch_photo_size, (photo_group[k], ) + (set_photo_size(), )) for k in photo_group.keys()]
 
 class PhotoStream:
   def __init__(self, inode, path, user):
