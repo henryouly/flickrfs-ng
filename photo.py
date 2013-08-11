@@ -51,24 +51,17 @@ def photo_url_reducer(url_dict, photo):
   url_dict[o.hostname].append(photo)
   return url_dict
 
-def set_photo_size():
-  while True:
-    (photo, size) = (yield)
-    photo.inode['st_size'] = photo.size = size
-    log.debug("url:%s size:%d" % (photo.url, size))
-
-def fetch_photo_size(photos, coroutine):
+def fetch_photo_size(photos):
   s = requests.Session()
-  coroutine.next()
   for photo in photos:
     r = s.head(photo.url)
     size = int(r.headers.get('content-length'))
-    coroutine.send((photo, size))
-  coroutine.close()
+    photo.inode['st_size'] = photo.size = size
+    log.debug("url:%s size:%d" % (photo.url, size))
 
 def _batch_fetch_size(photo_list):
   photo_group = reduce(photo_url_reducer, photo_list, defaultdict(list))
-  [thread.start_new_thread(fetch_photo_size, (photo_group[k], ) + (set_photo_size(), )) for k in photo_group.keys()]
+  [thread.start_new_thread(fetch_photo_size, (photo_group[k], )) for k in photo_group.keys()]
 
 class PhotoStream:
   def __init__(self, inode, path, user):
@@ -132,7 +125,7 @@ class PhotoSyncer:
     self.add_photo_func = add_photo
     self.sync_interval = sync_interval
 
-  def populate_stream_thread(self):
+  def _populate_stream_thread(self):
     log.info("populate_stream_thread start")
     pages = 1
     current_page = 1
@@ -148,30 +141,13 @@ class PhotoSyncer:
       current_page += 1
     log.info("populate_stream_thread update sizes")
     _batch_fetch_size(all_photos)
-    #for photo in all_photos:
-    #  photo.fetch_size()
     log.info("populate_stream_thread end")
 
-  def prefetch_file_thread(self, photo):
-    log.info("prefetch_file_thread start, filename: " + photo.filename)
-    with contextlib.closing(urllib.urlopen(photo.url)) as d:
-      data = d.read()
-      cache = PhotoCache()
-      cache[photo.id] = data
-
   def _run_in_background(self, func, *args, **kw):
-    t = threading.Thread(target=_log_exception_wrapper, args=(func,) + args)
-    t.start()
-    return t
+    thread.start_new_thread(_log_exception_wrapper, (func,) + args, )
 
   def start_sync_thread(self):
-    return self._run_in_background(self.populate_stream_thread)
-
-  #def start_prefetch_thread(self, photo):
-  #  cache = PhotoCache()
-  #  if photo.id not in cache.keys():
-  #    photo.data_fetching_thread = self._run_in_background(self.prefetch_file_thread, photo)
-
+    self._run_in_background(self._populate_stream_thread)
 
 class Photo(object):
   def __init__(self, photo):
@@ -191,8 +167,6 @@ class Photo(object):
   def fetch_size(self):
     if self.size == 0:
       assert len(self.url) > 0
-      #r = requests.head(self.url, timeout=2.0)
-      #self.size = int(r.headers['content-length'])
       log.info('requesting ' + self.url)
       with contextlib.closing(urllib.urlopen(self.url)) as d:
         self.size = int(d.info()['Content-Length'])
@@ -207,10 +181,10 @@ class Photo(object):
     log.info("read_file done")
     yield len(data)
 
-  def fetch_file(self, read):
+  def fetch_file(self, target):
     r = requests.get(self.url)
     assert r.status_code == 200
-    yield read.send(r.content)
+    yield target.send(r.content)
 
   def prefetch_file_data(self):
     self.fetch_size()
@@ -253,15 +227,15 @@ class PhotoCache(object):
   def __getitem__(self, key, default=None):
     if key not in self._key_order:
       return default
-    self.__mark(key)
+    self._mark(key)
     v = self.db.get(str(key))
     return cPickle.loads(v)
 
   def __setitem__(self, key, value):
     self.db[str(key)] = cPickle.dumps(value)
-    self.__mark(key)
+    self._mark(key)
 
-  def __mark(self, key):
+  def _mark(self, key):
     if key in self._key_order:
       self._key_order.remove(key)
 
